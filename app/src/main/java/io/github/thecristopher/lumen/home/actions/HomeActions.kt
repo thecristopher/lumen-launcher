@@ -10,8 +10,11 @@ import io.github.thecristopher.lumen.apps.helpers.splitHome
 import io.github.thecristopher.lumen.shelf.ShelfRepository
 import io.github.thecristopher.lumen.shelf.ShelfRow
 import io.github.thecristopher.lumen.shelf.helpers.pickShelf
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+private const val LOG_TAG = "Lumen"
 
 /**
  * Reads the installed apps and lays them out with the default favorites and hidden list.
@@ -32,6 +35,8 @@ suspend fun loadShelves(repository: ShelfRepository, layout: HomeLayout): Map<St
     withContext(Dispatchers.IO) {
         val watchNext = repository.watchNext()
         val previews = repository.previews()
+        // Which apps publish anything at all, handy to know which ones deserve a dock spot.
+        Log.i(LOG_TAG, "TV provider publishers: ${(watchNext + previews).groupingBy { it.packageName }.eachCount()}")
         layout.dock
             .mapNotNull { app -> pickShelf(app.packageName, watchNext, previews)?.let { app.packageName to it } }
             .toMap()

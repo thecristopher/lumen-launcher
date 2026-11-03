@@ -8,9 +8,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.github.thecristopher.lumen.apps.AppRepository
 import io.github.thecristopher.lumen.apps.LaunchableApp
+import io.github.thecristopher.lumen.apps.RecentsStore
 import io.github.thecristopher.lumen.home.HomeScreen
 import io.github.thecristopher.lumen.shelf.ShelfItem
 import io.github.thecristopher.lumen.shelf.ShelfRepository
@@ -21,6 +23,9 @@ class MainActivity : ComponentActivity() {
 
     private val repository by lazy { AppRepository(packageManager) }
     private val shelfRepository by lazy { ShelfRepository(contentResolver) }
+    private val recentsStore by lazy { RecentsStore(this) }
+
+    private var recents by mutableStateOf(emptyList<String>())
 
     // Bumped on every Home press so the screen goes back to the first app, like tvOS.
     private var homePresses by mutableIntStateOf(0)
@@ -34,11 +39,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         askForMissingTvPermissions()
+        recents = recentsStore.read()
         setContent {
             LumenTheme {
                 HomeScreen(
                     repository = repository,
                     shelfRepository = shelfRepository,
+                    recents = recents,
                     homePresses = homePresses,
                     refreshes = refreshes,
                     onLaunch = ::launch,
@@ -64,7 +71,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun launch(app: LaunchableApp) {
-        repository.launchIntent(app)?.let(::startActivity)
+        val intent = repository.launchIntent(app) ?: return
+        startActivity(intent)
+        rememberLaunch(app.packageName)
     }
 
     // Opens the exact episode when the app gave a deep link, the app itself otherwise.
@@ -73,7 +82,11 @@ class MainActivity : ComponentActivity() {
         val opened = deepLink != null && runCatching {
             startActivity(deepLink.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }.isSuccess
-        if (!opened) launch(LaunchableApp(item.packageName, item.title))
+        if (opened) rememberLaunch(item.packageName) else launch(LaunchableApp(item.packageName, item.title))
+    }
+
+    private fun rememberLaunch(packageName: String) {
+        recents = recentsStore.record(packageName)
     }
 
     private companion object {

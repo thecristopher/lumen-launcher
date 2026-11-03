@@ -17,6 +17,7 @@ Early. The first version draws the home screen:
 - a clock
 - a Top Shelf with what you were watching in the focused dock app, read from the system TV provider
   (its watch next list, or its preview channel), opening the exact episode on OK
+- a Recents row under the dock with the last five apps you opened, for apps that publish nothing
 
 Coming next: reordering, a control center and an aerial screensaver. The interactive mockup in [`mockup/lumen.html`](mockup/lumen.html) shows where it is going.
 
