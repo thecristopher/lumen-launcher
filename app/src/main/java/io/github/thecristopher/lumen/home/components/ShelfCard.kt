@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -34,8 +35,9 @@ import io.github.thecristopher.lumen.shelf.ShelfItem
 import io.github.thecristopher.lumen.ui.theme.LumenColors
 import io.github.thecristopher.lumen.ui.theme.LumenType
 
-val CardWidth = 168.dp
-val CardHeight = 94.dp
+// Four cards fill the dock's width exactly: 4 x 213 + 3 gaps of 14 = 894.
+val CardWidth = 213.dp
+val CardHeight = 120.dp
 private val CardShape = RoundedCornerShape(8.dp)
 private const val FOCUSED_SCALE = 1.1f
 
@@ -43,12 +45,14 @@ private const val FOCUSED_SCALE = 1.1f
  * A Top Shelf card: the poster an app published, with its title over a scrim once focused,
  * so the artwork speaks for itself until you land on it.
  * @param item the content this card opens
+ * @param onFocused called when the card gains focus
  * @param onClick called on OK or Enter
  */
 @Composable
-fun ShelfCard(item: ShelfItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ShelfCard(item: ShelfItem, onFocused: () -> Unit, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
+    LaunchedEffect(focused) { if (focused) onFocused() }
     val scale by animateFloatAsState(
         if (focused) FOCUSED_SCALE else 1f,
         spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),

@@ -9,14 +9,11 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,7 +65,6 @@ private const val TILT_Y_DEGREES = 4f
  * @param onFocused called when the tile gains focus
  * @param onClick called on OK or Enter
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AppTile(
     app: LaunchableApp,
@@ -79,13 +75,7 @@ fun AppTile(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    // The focused node is only the tile, so reveal the whole column or the name would land off screen.
-    val reveal = remember { BringIntoViewRequester() }
-    LaunchedEffect(focused) {
-        if (!focused) return@LaunchedEffect
-        onFocused()
-        reveal.bringIntoView()
-    }
+    LaunchedEffect(focused) { if (focused) onFocused() }
 
     val scale by animateFloatAsState(
         if (focused) FOCUSED_SCALE else 1f,
@@ -96,9 +86,7 @@ fun AppTile(
     val sway = if (focused) rememberSway() else 0f
 
     Column(
-        modifier
-            .zIndex(if (focused) 1f else 0f)
-            .bringIntoViewRequester(reveal),
+        modifier.zIndex(if (focused) 1f else 0f),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {

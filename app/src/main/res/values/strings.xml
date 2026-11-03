@@ -5,4 +5,5 @@
     <string name="shelf_soon">Aquí aparecerá lo que esta app publique en su canal.</string>
     <string name="shelf_welcome">Elige una app para empezar.</string>
     <string name="shelf_continue">Continuar viendo</string>
+    <string name="recents_title">Recientes</string>
 </resources>
