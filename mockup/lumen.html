@@ -1,0 +1,591 @@
+<title>Lumen Launcher</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a 16:9 TV stage scaled to the page width, with a remote and the key legend underneath.
+   Single dark look on purpose: it is a television interface viewed in a dim room. */
+:root{
+  --ink:#07080b;
+  --panel:#111318;
+  --raise:#1c1e25;
+  --line:#2a2d37;
+  --fg:#eef0f5;
+  --muted:#9aa1b0;
+  --focus:#f4f5f8;
+  --ui:"Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+}
+html,body{background:var(--ink);color:var(--fg)}
+body{font-family:var(--ui);font-size:15px;line-height:1.5}
+.page{max-width:1240px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left,0px));padding-right:max(16px, env(safe-area-inset-right,0px));padding-block:28px 56px;display:flex;flex-direction:column;gap:24px}
+header{display:flex;flex-direction:column;gap:6px}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+h1{margin:0;font-size:clamp(34px,5vw,52px);line-height:1;font-weight:700;letter-spacing:-.03em;text-wrap:balance}
+header p{margin:6px 0 0;color:var(--muted);max-width:62ch}
+
+/* ---------- TV frame ---------- */
+.frame{position:relative;width:100%;max-width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#000;box-shadow:0 0 0 1px var(--line),0 40px 90px -40px #000;outline:none;cursor:default}
+.frame:focus-visible{box-shadow:0 0 0 2px var(--focus),0 40px 90px -40px #000}
+.stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;color:#fff;font-family:var(--ui);user-select:none;-webkit-user-select:none}
+.bg{position:absolute;inset:-160px;filter:blur(80px) saturate(1.25);transition:opacity 1s ease;background:#07080b}
+.vignette{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.18) 0%,rgba(0,0,0,0) 28%,rgba(0,0,0,.42) 60%,rgba(0,0,0,.86) 100%);transition:background .6s}
+.stage.in-grid .vignette{background:rgba(0,0,0,.66)}
+.clock{position:absolute;right:64px;top:44px;font-size:40px;font-weight:500;font-variant-numeric:tabular-nums;text-shadow:0 2px 14px rgba(0,0,0,.45);z-index:6;transition:opacity .4s}
+.stage.saver .clock{opacity:0}
+
+.content{position:absolute;inset:0;transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.stage.in-grid .content{transform:translateY(-570px)}
+.dim{position:absolute;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .4s;z-index:7}
+.stage.cc-open .dim{opacity:1}
+
+/* Top Shelf */
+.shelf{position:absolute;left:0;top:0;width:1920px;height:560px;transition:opacity .5s}
+.stage.in-grid .shelf{opacity:0}
+.hero{position:absolute;left:64px;bottom:70px;max-width:1150px;animation:rise .45s cubic-bezier(.2,.8,.2,1)}
+.hero .tag{font-size:22px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.6);font-weight:600}
+.hero h2{margin:12px 0 10px;font-size:96px;line-height:1;font-weight:700;letter-spacing:-.03em}
+.hero p{margin:0;font-size:30px;line-height:1.35;color:rgba(255,255,255,.74);max-width:900px}
+.shelf-label{position:absolute;left:64px;top:182px;font-size:26px;font-weight:600;color:rgba(255,255,255,.82);animation:rise .45s cubic-bezier(.2,.8,.2,1)}
+.cards{position:absolute;left:64px;top:236px;display:flex;gap:28px;animation:rise .5s cubic-bezier(.2,.8,.2,1)}
+.card{position:relative;width:336px;height:189px;border-radius:16px;overflow:hidden;flex:none;box-shadow:0 12px 30px -12px rgba(0,0,0,.65);transition:transform .28s cubic-bezier(.2,.8,.2,1),box-shadow .28s}
+.card .ctitle{position:absolute;left:20px;right:20px;bottom:16px;font-size:25px;line-height:1.15;font-weight:700;text-shadow:0 2px 12px rgba(0,0,0,.55);text-wrap:balance}
+.card.is-focus{transform:scale(1.1);z-index:2;box-shadow:0 34px 60px -18px rgba(0,0,0,.85)}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* App tiles */
+.tile{position:absolute;width:320px;height:192px;z-index:1;transition:left .38s cubic-bezier(.2,.8,.2,1),top .38s cubic-bezier(.2,.8,.2,1),transform .28s cubic-bezier(.2,.8,.2,1),opacity .4s}
+.tile .art{position:absolute;inset:0;border-radius:20px;overflow:hidden;display:grid;place-items:center;box-shadow:0 12px 26px -12px rgba(0,0,0,.75);transform:perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg));transition:box-shadow .28s}
+.tile.is-focus{transform:scale(1.12) translateY(-6px);z-index:4}
+.tile.is-focus .art{box-shadow:0 42px 64px -20px rgba(0,0,0,.9)}
+.tile.is-focus:not(.is-mouse):not(.is-edit) .art{animation:sway 5.5s ease-in-out infinite alternate}
+.shine{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s;background:radial-gradient(120% 95% at var(--sx,22%) var(--sy,0%),rgba(255,255,255,.42),rgba(255,255,255,0) 52%);mix-blend-mode:screen}
+.tile.is-focus .shine,.card.is-focus .shine{opacity:1}
+.tile.is-focus:not(.is-mouse) .shine{animation:glint 5.5s ease-in-out infinite alternate}
+.tname{position:absolute;left:-60px;right:-60px;top:calc(100% + 18px);text-align:center;font-size:24px;font-weight:500;opacity:0;transition:opacity .25s;white-space:nowrap;text-shadow:0 2px 10px rgba(0,0,0,.5)}
+.tile.is-focus .tname{opacity:1}
+.stage.in-grid .tile.dock:not(.is-focus){opacity:.5}
+.tile.is-edit .art{animation:wiggle .24s ease-in-out infinite alternate}
+.tile.is-edit:nth-child(2n) .art{animation-delay:-.12s}
+.tile.is-edit.is-focus{transform:scale(1.18) translateY(-12px)}
+.tile.is-edit.is-focus .art{animation:none;box-shadow:0 0 0 4px rgba(255,255,255,.9),0 50px 70px -20px rgba(0,0,0,.9)}
+.bump{animation:bump .3s ease}
+@keyframes sway{0%{transform:perspective(900px) rotateX(3deg) rotateY(-4deg)}100%{transform:perspective(900px) rotateX(-3deg) rotateY(4deg)}}
+@keyframes glint{0%{--sx:15%}100%{--sx:85%}}
+@keyframes wiggle{from{transform:rotate(-1.3deg)}to{transform:rotate(1.3deg)}}
+@keyframes bump{0%,100%{translate:0 0}30%{translate:-10px 0}60%{translate:6px 0}}
+@property --sx{syntax:"<percentage>";inherits:true;initial-value:22%}
+.word{display:inline-flex;align-items:center;gap:14px;line-height:1;white-space:nowrap}
+.yt{display:inline-block;width:58px;height:40px;border-radius:11px;background:#ff0033;position:relative}
+.yt::after{content:"";position:absolute;left:23px;top:11px;border-left:16px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent}
+.stack{display:flex;flex-direction:column;align-items:center;gap:8px}
+.sub{font-size:22px;font-weight:500;color:rgba(255,255,255,.62)}
+
+/* Control Center */
+.cc{position:absolute;top:0;right:0;width:620px;height:1080px;box-sizing:border-box;padding:64px 56px;background:rgba(26,27,32,.78);backdrop-filter:blur(40px) saturate(1.5);-webkit-backdrop-filter:blur(40px) saturate(1.5);transform:translateX(105%);transition:transform .45s cubic-bezier(.2,.8,.2,1);z-index:8;display:flex;flex-direction:column;gap:26px;box-shadow:-30px 0 80px rgba(0,0,0,.5)}
+.stage.cc-open .cc{transform:none}
+.cc-date{font-size:26px;color:rgba(255,255,255,.62);font-weight:500;text-transform:capitalize}
+.cc-time{font-size:84px;font-weight:600;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.np{border-radius:22px;background:rgba(255,255,255,.07);padding:24px 26px;display:flex;gap:20px;align-items:center}
+.np .disc{width:76px;height:76px;border-radius:14px;background:linear-gradient(140deg,#3a3d48,#1d1f26);flex:none}
+.np b{display:block;font-size:26px;font-weight:600}
+.np span{font-size:22px;color:rgba(255,255,255,.55)}
+.cc-list{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:center;gap:20px;padding:18px 22px;border-radius:20px;transition:background .2s,color .2s,transform .2s}
+.row .ic{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.12);display:grid;place-items:center;flex:none}
+.row .ic svg{width:28px;height:28px}
+.row .lbl{flex:1;font-size:28px;font-weight:500}
+.row .val{font-size:24px;color:rgba(255,255,255,.55)}
+.row.is-focus{background:rgba(255,255,255,.94);color:#111;transform:scale(1.03)}
+.row.is-focus .val{color:rgba(0,0,0,.55)}
+.row.is-focus .ic{background:rgba(0,0,0,.08)}
+
+/* Launch overlay, toast, saver, sleep */
+.launch{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;z-index:9;display:grid;place-items:center;overflow:hidden}
+.l-inner{display:flex;flex-direction:column;align-items:center;gap:30px;text-align:center}
+.l-eyebrow{font-size:30px;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.7);font-weight:600}
+.l-title{font-size:110px;font-weight:700;letter-spacing:-.03em;line-height:1;max-width:1500px;text-wrap:balance;text-shadow:0 6px 30px rgba(0,0,0,.4)}
+.l-hint{font-size:28px;color:rgba(255,255,255,.75);background:rgba(0,0,0,.35);padding:14px 26px;border-radius:999px}
+.toast{position:absolute;left:50%;top:40px;transform:translate(-50%,-30px);opacity:0;z-index:12;font-size:26px;font-weight:500;padding:16px 30px;border-radius:999px;background:rgba(30,31,37,.82);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:opacity .3s,transform .3s;white-space:nowrap}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+#saver{position:absolute;left:0;top:0;width:1920px;height:1080px;opacity:0;pointer-events:none;transition:opacity 1.4s ease;z-index:10}
+.stage.saver #saver{opacity:1;pointer-events:auto}
+.saver-ui{position:absolute;inset:0;z-index:11;pointer-events:none;opacity:0;transition:opacity 1.6s ease 0.4s}
+.stage.saver .saver-ui{opacity:1}
+.saver-ui .big{position:absolute;right:80px;top:64px;font-size:96px;font-weight:600;font-variant-numeric:tabular-nums;text-shadow:0 4px 30px rgba(0,0,0,.35)}
+.saver-ui .cap{position:absolute;left:80px;bottom:72px;font-size:28px;font-weight:500;color:rgba(255,255,255,.82);text-shadow:0 2px 16px rgba(0,0,0,.5)}
+.sleep{position:absolute;inset:0;background:#000;z-index:13;display:grid;place-items:center;font-size:26px;color:rgba(255,255,255,.35)}
+
+/* ---------- Below the TV ---------- */
+.below{display:grid;grid-template-columns:240px minmax(0,1fr);gap:32px;align-items:start}
+@media (max-width:760px){.below{grid-template-columns:minmax(0,1fr);justify-items:center}.info{width:100%}}
+.remote{width:208px;box-sizing:border-box;padding:22px 18px 26px;border-radius:46px;background:linear-gradient(180deg,#2a2b31,#18191d);box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 24px 50px -24px #000;display:flex;flex-direction:column;align-items:center;gap:18px}
+.pad{position:relative;width:172px;height:172px;border-radius:50%;background:radial-gradient(circle at 50% 35%,#30323a,#1c1d22);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.remote button{font:inherit;color:var(--fg);border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.remote button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.pad .dir{position:absolute;width:52px;height:52px;border-radius:50%;background:transparent;display:grid;place-items:center}
+.pad .dir:active{background:rgba(255,255,255,.08)}
+.pad .dir svg{width:20px;height:20px;stroke:rgba(255,255,255,.72);fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.d-up{left:60px;top:4px}.d-down{left:60px;bottom:4px}.d-left{left:4px;top:60px}.d-right{right:4px;top:60px}
+.pad .ok{position:absolute;left:48px;top:48px;width:76px;height:76px;border-radius:50%;background:#2c2e35;box-shadow:inset 0 0 0 1px rgba(255,255,255,.1),0 4px 10px rgba(0,0,0,.4);font-weight:600;font-size:14px;letter-spacing:.04em}
+.pad .ok:active{background:#3a3d46}
+.keys{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.keys button{background:#2b2d34;border-radius:999px;padding:10px 6px;font-size:13px;font-weight:500}
+.keys button:active{background:#3a3d46}
+.info{display:flex;flex-direction:column;gap:22px;min-width:0}
+.info h2{margin:0 0 10px;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.legend{display:grid;grid-template-columns:auto 1fr;gap:10px 16px;margin:0;align-items:baseline}
+.legend dt{margin:0;white-space:nowrap}
+.legend dd{margin:0;color:var(--fg)}
+kbd{font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:6px;background:var(--raise);box-shadow:inset 0 -1px 0 var(--line),0 0 0 1px var(--line);color:var(--fg)}
+.notes{margin:0;padding-left:18px;color:var(--muted);display:flex;flex-direction:column;gap:6px;max-width:70ch}
+.notes b{color:var(--fg);font-weight:600}
+@media (prefers-reduced-motion: reduce){
+  .tile,.tile .art,.content,.cc,.card,.bg,.toast,#saver,.saver-ui{transition:none!important}
+  .tile .art,.shine,.hero,.cards,.shelf-label{animation:none!important}
+}
+</style>
+
+<div class="page">
+  <header>
+    <span class="eyebrow">Prototipo · launcher para tus Fire TV</span>
+    <h1>Lumen</h1>
+    <p>Navega con las flechas del teclado o con el mando de abajo. Haz clic en la tele para darle el foco, o pasa el ratón sobre una app para inclinarla.</p>
+  </header>
+
+  <div class="frame" id="frame" tabindex="0" aria-label="Pantalla de la tele. Usa las flechas para moverte.">
+    <div class="stage" id="stage">
+      <div class="bg" id="bgA"></div>
+      <div class="bg" id="bgB" style="opacity:0"></div>
+      <div class="vignette"></div>
+      <div class="clock" id="clock">--:--</div>
+      <div class="content" id="content">
+        <div class="shelf" id="shelf"></div>
+        <div id="tiles"></div>
+      </div>
+      <div class="dim"></div>
+      <aside class="cc" id="cc" aria-label="Centro de control"></aside>
+      <div class="launch" id="launch" hidden></div>
+      <canvas id="saver" width="960" height="540"></canvas>
+      <div class="saver-ui"><div class="big" id="saverClock">--:--</div><div class="cap" id="saverCap">Paisaje aéreo</div></div>
+      <div class="sleep" id="sleep" hidden>Reposo · pulsa cualquier botón</div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <div class="below">
+    <div class="remote" aria-label="Mando">
+      <div class="pad">
+        <button class="dir d-up" data-cmd="up" aria-label="Arriba"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
+        <button class="dir d-left" data-cmd="left" aria-label="Izquierda"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <button class="dir d-right" data-cmd="right" aria-label="Derecha"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+        <button class="dir d-down" data-cmd="down" aria-label="Abajo"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+        <button class="ok" id="okBtn" aria-label="OK. Mantén pulsado para reordenar">OK</button>
+      </div>
+      <div class="keys">
+        <button data-cmd="back">Atrás</button>
+        <button data-cmd="home">Inicio</button>
+        <button data-cmd="cc">Control</button>
+        <button data-cmd="saver">Reposo</button>
+      </div>
+    </div>
+
+    <div class="info">
+      <section>
+        <h2>Controles</h2>
+        <dl class="legend">
+          <dt><kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd></dt><dd>Mover el foco</dd>
+          <dt><kbd>Enter</kbd></dt><dd>Abrir. Mantenlo pulsado para reordenar las apps.</dd>
+          <dt><kbd>Esc</kbd></dt><dd>Volver</dd>
+          <dt><kbd>C</kbd></dt><dd>Centro de control</dd>
+          <dt><kbd>S</kbd></dt><dd>Salvapantallas (también arranca solo tras 45 s sin tocar nada)</dd>
+          <dt><kbd>H</kbd></dt><dd>Inicio</dd>
+        </dl>
+      </section>
+      <section>
+        <h2>Qué es real en este prototipo</h2>
+        <ul class="notes">
+          <li><b>Las apps</b> son las de un Fire TV real.</li>
+          <li><b>Continuar viendo</b> usa títulos reales que Crunchyroll publica en un Fire TV.</li>
+          <li><b>Los logos</b> son rótulos de texto; el launcher real usaría el banner que trae cada app.</li>
+          <li><b>El salvapantallas</b> es un paisaje generado por código; en el stick serían vídeos aéreos.</li>
+          <li><b>El orden</b> que elijas al reordenar se guarda en este navegador.</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const APPS = [
+    {id:'crunchyroll', name:'Crunchyroll', bg:'#f47521', art:['#f47521','#5a1e05'], word:'Crunchyroll', fg:'#fff', w:700, fs:46, shelf:true},
+    {id:'netflix', name:'Netflix', bg:'#0a0a0a', art:['#b20710','#1a0204'], word:'NETFLIX', fg:'#e50914', w:800, fs:58, ls:'.03em'},
+    {id:'disney', name:'Disney+', bg:'linear-gradient(140deg,#0b1546 0%,#123e6e 55%,#1b8ba3 100%)', art:['#1d8aa0','#0b1546'], word:'Disney+', fg:'#fff', w:600, fs:54},
+    {id:'max', name:'HBO Max', bg:'linear-gradient(140deg,#07071a,#2a1466)', art:['#5a2be0','#0c0830'], word:'HBO Max', fg:'#fff', w:800, fs:52, ls:'-.03em'},
+    {id:'appletv', name:'Apple TV', bg:'linear-gradient(160deg,#2c2c31,#050506)', art:['#8a8a96','#141418'], word:'Apple TV', fg:'#f5f5f7', w:600, fs:50},
+    {id:'youtube', name:'YouTube', bg:'#ffffff', art:['#ff2a3d','#3a0710'], yt:true},
+    {id:'twitch', name:'Twitch', bg:'#9146ff', art:['#9146ff','#24104d'], word:'twitch', fg:'#fff', w:800, fs:58},
+    {id:'tubi', name:'Tubi', bg:'#7408ff', art:['#8f3bff','#2b0866'], word:'tubi', fg:'#fff200', w:800, fs:66},
+    {id:'smarthome', name:'Smart Home', bg:'linear-gradient(150deg,#1d2a38,#0e151d)', art:['#2f8fb8','#0b1820'], word:'Smart Home', fg:'#7fd6f5', w:600, fs:42, sub:'Cámaras y luces', blurb:'Abre las cámaras y las luces de casa.'},
+    {id:'downloader', name:'Downloader', bg:'#f37a1f', art:['#f37a1f','#3d1c05'], word:'Downloader', fg:'#fff', w:700, fs:42, blurb:'Descarga e instala apps desde una dirección web.'},
+    {id:'firemirror', name:'FireMirror', bg:'linear-gradient(150deg,#2f6bf0,#1b3fa8)', art:['#2f6bf0','#0b1a45'], word:'FireMirror', fg:'#fff', w:700, fs:42, blurb:'Duplica la pantalla de tu móvil en la tele.'},
+    {id:'appstore', name:'Appstore', bg:'#1f2a36', art:['#ff9900','#1f2a36'], word:'appstore', fg:'#ff9900', w:800, fs:52, blurb:'Instala y actualiza tus apps.'},
+    {id:'settings', name:'Ajustes', bg:'linear-gradient(160deg,#4a4a51,#232327)', art:['#8e8e96','#1c1c20'], gear:true, word:'Ajustes', fg:'#e7e8ec', w:600, fs:40, blurb:'Wi-Fi, pantalla, mandos y cuenta.'}
+  ];
+  const CR = [
+    {t:'Witch Hat Atelier', h:[268,205]},
+    {t:"Frieren: Beyond Journey's End", h:[160,215]},
+    {t:'JUJUTSU KAISEN', h:[255,330]},
+    {t:'SPY x FAMILY', h:[340,18]},
+    {t:'Fullmetal Alchemist: Brotherhood', h:[22,42]}
+  ];
+  const byId = Object.fromEntries(APPS.map(a => [a.id, a]));
+  const $ = id => document.getElementById(id);
+  const stage = $('stage'), frame = $('frame'), shelf = $('shelf'), tilesEl = $('tiles');
+  const bgA = $('bgA'), bgB = $('bgB'), cc = $('cc'), launch = $('launch'), toastEl = $('toast'), sleepEl = $('sleep');
+  const canvas = $('saver'), g = canvas.getContext('2d');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  let order = APPS.map(a => a.id);
+  try { const s = JSON.parse(localStorage.getItem('lumen.order')); if (Array.isArray(s) && s.length === order.length && s.every(id => byId[id])) order = s; } catch (e) {}
+  let sound = true;
+  try { const v = localStorage.getItem('lumen.sound'); if (v !== null) sound = v === '1'; } catch (e) {}
+
+  const S = {mode:'home', zone:'apps', idx:0, dockIdx:0, shelfIdx:0, ccIdx:0};
+  const TW = 320, GX = 48, X0 = 64, DOCKY = 610, GRIDY = 900, ROWG = 264;
+  const pos = i => i < 5 ? [X0 + i*(TW+GX), DOCKY] : [X0 + ((i-5)%5)*(TW+GX), GRIDY + Math.floor((i-5)/5)*ROWG];
+
+  /* ---------- scale the 1920x1080 stage to the frame ---------- */
+  const fit = () => { stage.style.transform = `scale(${frame.clientWidth/1920})`; };
+  new ResizeObserver(fit).observe(frame); fit();
+
+  /* ---------- sound ---------- */
+  let ac = null;
+  function blip(f1, f2, dur, gain){
+    if (!sound) return;
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const t = ac.currentTime, o = ac.createOscillator(), v = ac.createGain();
+      o.type = 'sine'; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t+dur);
+      v.gain.setValueAtTime(gain, t); v.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+      o.connect(v).connect(ac.destination); o.start(t); o.stop(t+dur+0.02);
+    } catch (e) {}
+  }
+  const tick = () => blip(2400, 1500, .035, .03);
+  const chime = () => blip(660, 1180, .12, .05);
+  const thud = () => blip(190, 110, .09, .06);
+
+  /* ---------- tiles ---------- */
+  function gearSVG(size){
+    let teeth = '';
+    for (let i = 0; i < 8; i++) teeth += `<rect x="21" y="3" width="6" height="10" rx="2" transform="rotate(${i*45} 24 24)"/>`;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 48 48" aria-hidden="true"><g fill="#d9dbe0">${teeth}</g><circle cx="24" cy="24" r="14" fill="#d9dbe0"/><circle cx="24" cy="24" r="6" fill="#36363c"/></svg>`;
+  }
+  function wordHTML(a, m = 1){
+    if (a.yt) return `<span class="word" style="font-size:${46*m}px;font-weight:700;letter-spacing:-.03em;color:#0f0f0f"><i class="yt" style="transform:scale(${m})"></i>YouTube</span>`;
+    const w = `<span class="word" style="color:${a.fg};font-weight:${a.w};font-size:${a.fs*m}px;letter-spacing:${a.ls || '-.015em'}">${a.gear ? gearSVG(44*m) : ''}${a.word}</span>`;
+    return a.sub ? `<span class="stack">${w}<span class="sub" style="font-size:${22*m}px">${a.sub}</span></span>` : w;
+  }
+  const tileEls = {};
+  APPS.forEach(a => {
+    const t = document.createElement('div');
+    t.className = 'tile'; t.dataset.id = a.id;
+    t.innerHTML = `<div class="art" style="background:${a.bg}">${wordHTML(a)}<div class="shine"></div></div><div class="tname">${a.name}</div>`;
+    t.addEventListener('mouseenter', () => { if (S.mode !== 'home') return; S.zone = 'apps'; S.idx = order.indexOf(a.id); if (S.idx < 5) S.dockIdx = S.idx; update(); });
+    t.addEventListener('mousemove', e => {
+      if (!t.classList.contains('is-focus') || S.mode !== 'home') return;
+      const r = t.getBoundingClientRect(), px = (e.clientX-r.left)/r.width, py = (e.clientY-r.top)/r.height;
+      t.classList.add('is-mouse');
+      t.style.setProperty('--ry', ((px-.5)*12).toFixed(2)+'deg');
+      t.style.setProperty('--rx', ((.5-py)*9).toFixed(2)+'deg');
+      t.style.setProperty('--sx', (px*100).toFixed(1)+'%');
+      t.style.setProperty('--sy', (py*100).toFixed(1)+'%');
+    });
+    t.addEventListener('mouseleave', () => { t.classList.remove('is-mouse'); ['--rx','--ry','--sx','--sy'].forEach(p => t.style.removeProperty(p)); });
+    t.addEventListener('click', () => { if (S.mode === 'home') { S.zone = 'apps'; S.idx = order.indexOf(a.id); openApp(); } });
+    tilesEl.appendChild(t); tileEls[a.id] = t;
+  });
+
+  /* ---------- top shelf ---------- */
+  let shelfKey = '', cardEls = [];
+  const cardColors = c => [`hsl(${c.h[0]} 72% 52%)`, `hsl(${c.h[1]} 66% 20%)`];
+  const cardBg = c => `radial-gradient(85% 95% at 88% 12%, hsl(${c.h[0]} 85% 66% / .85), transparent 60%), radial-gradient(60% 70% at 10% 100%, hsl(${c.h[1]} 70% 40% / .7), transparent 70%), linear-gradient(140deg, hsl(${c.h[0]} 70% 44%), hsl(${c.h[1]} 66% 16%))`;
+  function renderShelf(app){
+    if (shelfKey === app.id) return;
+    shelfKey = app.id;
+    if (app.shelf) {
+      shelf.innerHTML = `<div class="shelf-label">Continuar viendo · ${app.name}</div><div class="cards">${CR.map(c => `<div class="card" style="background:${cardBg(c)}"><div class="shine"></div><div class="ctitle">${c.t}</div></div>`).join('')}</div>`;
+      cardEls = [...shelf.querySelectorAll('.card')];
+      cardEls.forEach((el, i) => {
+        el.addEventListener('mouseenter', () => { if (S.mode !== 'home') return; S.zone = 'shelf'; S.shelfIdx = i; update(); });
+        el.addEventListener('click', () => { if (S.mode !== 'home') return; S.zone = 'shelf'; S.shelfIdx = i; update(); openApp(); });
+      });
+    } else {
+      cardEls = [];
+      shelf.innerHTML = `<div class="hero"><div class="tag">Top Shelf</div><h2>${app.name}</h2><p>${app.blurb || `Cuando ${app.name} publique contenido destacado, aparecerá aquí.`}</p></div>`;
+    }
+  }
+
+  /* ---------- background ---------- */
+  let bgKey = '', bgFront = bgA;
+  function setBg(key, c1, c2){
+    if (bgKey === key) return; bgKey = key;
+    const back = bgFront === bgA ? bgB : bgA;
+    back.style.background = `radial-gradient(55% 75% at 78% 16%, ${c1}, transparent 70%), radial-gradient(60% 80% at 14% 88%, ${c2}, transparent 72%), radial-gradient(45% 55% at 46% 38%, ${c1}66, transparent 70%), #07080b`;
+    back.style.opacity = 1; bgFront.style.opacity = 0; bgFront = back;
+  }
+
+  /* ---------- render state ---------- */
+  function update(){
+    const inGrid = S.zone === 'apps' && S.idx >= 5;
+    stage.classList.toggle('in-grid', inGrid);
+    order.forEach((id, i) => {
+      const t = tileEls[id], [x, y] = pos(i);
+      t.style.left = x+'px'; t.style.top = y+'px';
+      t.classList.toggle('dock', i < 5);
+      t.classList.toggle('is-focus', S.zone === 'apps' && i === S.idx);
+      t.classList.toggle('is-edit', S.mode === 'edit');
+    });
+    const dockApp = byId[order[S.dockIdx]];
+    renderShelf(dockApp);
+    cardEls.forEach((el, i) => el.classList.toggle('is-focus', S.zone === 'shelf' && i === S.shelfIdx));
+    if (S.zone === 'shelf' && CR[S.shelfIdx]) { const [c1, c2] = cardColors(CR[S.shelfIdx]); setBg('cr'+S.shelfIdx, c1, c2); }
+    else { const a = byId[order[S.idx]]; setBg(a.id, a.art[0], a.art[1]); }
+  }
+  function bump(){
+    thud();
+    const el = S.zone === 'shelf' ? cardEls[S.shelfIdx] : (S.mode === 'cc' ? cc.querySelector('.row.is-focus') : tileEls[order[S.idx]]);
+    if (!el || reduce) return;
+    el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+    setTimeout(() => el.classList.remove('bump'), 320);
+  }
+
+  function move(dir){
+    if (S.zone === 'shelf') {
+      if (dir === 'left' && S.shelfIdx > 0) S.shelfIdx--;
+      else if (dir === 'right' && S.shelfIdx < CR.length-1) S.shelfIdx++;
+      else if (dir === 'down') { S.zone = 'apps'; S.idx = S.dockIdx; }
+      else return bump();
+      tick(); update(); return;
+    }
+    const n = order.length, i = S.idx, col = i < 5 ? i : (i-5)%5;
+    let j = i;
+    if (dir === 'left' && col > 0) j = i-1;
+    if (dir === 'right' && col < 4 && i+1 < n && (i < 5 ? i+1 < 5 : true)) j = i+1;
+    if (dir === 'up') {
+      if (i < 5) { if (byId[order[i]].shelf) { S.zone = 'shelf'; tick(); update(); return; } return bump(); }
+      j = i-5;
+    }
+    if (dir === 'down') {
+      if (i+5 < n) j = i+5;
+      else if (i >= 5 && Math.floor((i-5)/5) < Math.floor((n-6)/5)) j = n-1;
+    }
+    if (j === i) return bump();
+    S.idx = j; if (j < 5) S.dockIdx = j;
+    tick(); update();
+  }
+
+  /* ---------- edit (reorder) ---------- */
+  function enterEdit(){ S.mode = 'edit'; chime(); toast('Reordenar: mueve la app con las flechas y pulsa Enter para soltarla'); update(); }
+  function exitEdit(){ S.mode = 'home'; try { localStorage.setItem('lumen.order', JSON.stringify(order)); } catch (e) {} chime(); toast('Orden guardado'); update(); }
+  function editMove(dir){
+    const i = S.idx, n = order.length; let j = i;
+    if (dir === 'left' && i > 0) j = i-1;
+    if (dir === 'right' && i < n-1) j = i+1;
+    if (dir === 'up' && i-5 >= 0) j = i-5;
+    if (dir === 'down' && i+5 < n) j = i+5;
+    if (j === i) return bump();
+    const [m] = order.splice(i, 1); order.splice(j, 0, m);
+    S.idx = j; if (j < 5) S.dockIdx = j;
+    shelfKey = ''; tick(); update();
+  }
+
+  /* ---------- launch ---------- */
+  function openApp(){
+    const app = byId[order[S.zone === 'shelf' ? S.dockIdx : S.idx]];
+    const card = S.zone === 'shelf' ? CR[S.shelfIdx] : null;
+    const el = card ? cardEls[S.shelfIdx] : tileEls[app.id];
+    chime();
+    const sr = stage.getBoundingClientRect(), r = el.getBoundingClientRect(), k = sr.width/1920;
+    const x = (r.left-sr.left)/k, y = (r.top-sr.top)/k, w = r.width/k, h = r.height/k;
+    launch.style.background = card ? cardBg(card) : app.bg;
+    launch.innerHTML = `<div class="l-inner">${card ? `<div class="l-eyebrow">${app.name}</div><div class="l-title">${card.t}</div>` : wordHTML(app, 2.2)}<div class="l-hint">Aquí se abriría ${app.name}. Pulsa Esc o Atrás para volver.</div></div>`;
+    launch.hidden = false; S.mode = 'launch';
+    if (!reduce) launch.animate([{transform:`translate(${x}px,${y}px) scale(${w/1920},${h/1080})`, opacity:.6}, {transform:'none', opacity:1}], {duration:520, easing:'cubic-bezier(.2,.8,.2,1)'});
+  }
+  function closeLaunch(){
+    S.mode = 'home'; tick();
+    if (reduce) { launch.hidden = true; return; }
+    const a = launch.animate([{opacity:1, transform:'none'}, {opacity:0, transform:'scale(.96)'}], {duration:260, easing:'ease-in'});
+    a.onfinish = () => { launch.hidden = true; };
+  }
+
+  /* ---------- control center ---------- */
+  const ICON = {
+    wifi:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 8.5a15 15 0 0 1 20 0"/><path d="M5.5 12a10 10 0 0 1 13 0"/><path d="M9 15.5a5 5 0 0 1 6 0"/><circle cx="12" cy="19" r="1.2" fill="currentColor"/></svg>',
+    sound:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg>',
+    saver:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 18l5-7 4 5 3-4 6 6z"/><circle cx="16" cy="7" r="2"/></svg>',
+    sleep:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg>'
+  };
+  const ccItems = [
+    {id:'wifi', label:'Wi-Fi', val:() => 'Conectado'},
+    {id:'sound', label:'Sonidos de navegación', val:() => sound ? 'Activados' : 'Desactivados'},
+    {id:'saver', label:'Salvapantallas', val:() => 'Iniciar'},
+    {id:'sleep', label:'Reposo', val:() => 'Apagar pantalla'}
+  ];
+  function renderCC(){
+    const d = new Date();
+    cc.innerHTML = `<div><div class="cc-date">${d.toLocaleDateString('es-MX', {weekday:'long', day:'numeric', month:'long'})}</div><div class="cc-time">${hhmm()}</div></div>
+      <div class="np"><div class="disc"></div><div><b>Nada en reproducción</b><span>Lo que suene en tus apps aparecerá aquí</span></div></div>
+      <div class="cc-list">${ccItems.map((it, i) => `<div class="row${i === S.ccIdx ? ' is-focus' : ''}"><div class="ic">${ICON[it.id]}</div><div class="lbl">${it.label}</div><div class="val">${it.val()}</div></div>`).join('')}</div>`;
+    cc.querySelectorAll('.row').forEach((row, i) => {
+      row.addEventListener('mouseenter', () => { if (S.mode !== 'cc') return; S.ccIdx = i; renderCC(); });
+      row.addEventListener('click', () => { if (S.mode !== 'cc') return; S.ccIdx = i; ccActivate(); });
+    });
+  }
+  function openCC(){ S.mode = 'cc'; S.ccIdx = 0; renderCC(); stage.classList.add('cc-open'); chime(); }
+  function closeCC(){ S.mode = 'home'; stage.classList.remove('cc-open'); tick(); }
+  function ccActivate(){
+    const it = ccItems[S.ccIdx];
+    if (it.id === 'wifi') { toast('Wi-Fi conectado. En el prototipo no cambia nada.'); tick(); }
+    if (it.id === 'sound') { sound = !sound; try { localStorage.setItem('lumen.sound', sound ? '1' : '0'); } catch (e) {} chime(); renderCC(); }
+    if (it.id === 'saver') { closeCC(); startSaver(); }
+    if (it.id === 'sleep') { closeCC(); S.mode = 'sleep'; sleepEl.hidden = false; }
+  }
+
+  /* ---------- screensaver ---------- */
+  const PAL = {
+    night:{top:'#060914', hor:'#1d2c52', sun:'#c9d6ff', far:'#1c2746', near:'#030409', mist:'#3b4f7d', sunY:.2, sunR:26, cap:'Paisaje aéreo · noche'},
+    dawn:{top:'#22305e', hor:'#f2a07b', sun:'#ffd9a8', far:'#6c5b80', near:'#100c18', mist:'#f5c2a3', sunY:.48, sunR:46, cap:'Paisaje aéreo · amanecer'},
+    day:{top:'#3a76c2', hor:'#cfe6f3', sun:'#fff6dc', far:'#7f9cb8', near:'#122029', mist:'#e7f2f8', sunY:.22, sunR:40, cap:'Paisaje aéreo · mediodía'},
+    dusk:{top:'#2b1f52', hor:'#f08a5d', sun:'#ffc38a', far:'#7a4b6f', near:'#130915', mist:'#f4aa8b', sunY:.46, sunR:50, cap:'Paisaje aéreo · atardecer'}
+  };
+  const palNow = () => { const h = new Date().getHours(); return h >= 20 || h < 5 ? PAL.night : h < 8 ? PAL.dawn : h < 17 ? PAL.day : PAL.dusk; };
+  const hex = c => [1,3,5].map(i => parseInt(c.slice(i, i+2), 16));
+  const mix = (a, b, t) => { const A = hex(a), B = hex(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i]-v)*t)).join(',')})`; };
+  let ridges = [], raf = 0, t0 = 0, pal = PAL.day;
+  function genRidges(){
+    ridges = [];
+    for (let l = 0; l < 6; l++) {
+      const waves = [];
+      for (let w = 0; w < 4; w++) waves.push({a:(12 + l*7) * Math.pow(.52, w) * (0.8 + Math.random()*.5), f:(0.0045 + Math.random()*0.004) * Math.pow(2.1, w), p:Math.random()*6.283});
+      ridges.push({base:248 + l*46, waves, v:4 + l*9});
+    }
+  }
+  function draw(t){
+    const W = 960, H = 540;
+    const sky = g.createLinearGradient(0, 0, 0, H*.7);
+    sky.addColorStop(0, pal.top); sky.addColorStop(1, pal.hor);
+    g.fillStyle = sky; g.fillRect(0, 0, W, H);
+    const sx = W*.68, sy = H*pal.sunY;
+    const glow = g.createRadialGradient(sx, sy, 0, sx, sy, 260);
+    glow.addColorStop(0, pal.sun + 'cc'); glow.addColorStop(.12, pal.sun + '66'); glow.addColorStop(1, pal.sun + '00');
+    g.fillStyle = glow; g.fillRect(0, 0, W, H);
+    g.fillStyle = pal.sun; g.beginPath(); g.arc(sx, sy, pal.sunR, 0, 6.283); g.fill();
+    ridges.forEach((L, l) => {
+      g.beginPath(); g.moveTo(0, H);
+      for (let x = 0; x <= W; x += 6) {
+        let y = L.base;
+        L.waves.forEach(wv => { y += wv.a * Math.sin((x + t*L.v) * wv.f + wv.p); });
+        g.lineTo(x, y);
+      }
+      g.lineTo(W, H); g.closePath();
+      g.fillStyle = mix(pal.far, pal.near, l/5); g.fill();
+      const m = g.createLinearGradient(0, L.base-30, 0, L.base+70);
+      m.addColorStop(0, pal.mist + '00'); m.addColorStop(.5, pal.mist + (l < 3 ? '2e' : '18')); m.addColorStop(1, pal.mist + '00');
+      g.fillStyle = m; g.fillRect(0, L.base-30, W, 100);
+    });
+  }
+  function loop(){ draw((performance.now()-t0)/1000); raf = requestAnimationFrame(loop); }
+  function startSaver(){
+    if (S.mode === 'saver') return;
+    S.mode = 'saver'; pal = palNow(); genRidges(); t0 = performance.now();
+    $('saverCap').textContent = pal.cap; $('saverClock').textContent = hhmm();
+    stage.classList.add('saver');
+    if (reduce) draw(0); else loop();
+  }
+  function wake(){
+    if (S.mode === 'saver') { cancelAnimationFrame(raf); stage.classList.remove('saver'); }
+    if (S.mode === 'sleep') sleepEl.hidden = true;
+    S.mode = 'home'; tick(); update();
+  }
+  let idleT = 0;
+  const resetIdle = () => { clearTimeout(idleT); idleT = setTimeout(() => { if (S.mode === 'home') startSaver(); }, 45000); };
+
+  /* ---------- misc ---------- */
+  let toastT = 0;
+  function toast(msg){ toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('show'), 2600); }
+  const hhmm = () => new Date().toLocaleTimeString('es-MX', {hour:'2-digit', minute:'2-digit', hour12:false});
+  function clock(){ $('clock').textContent = hhmm(); $('saverClock').textContent = hhmm(); }
+  clock(); setInterval(clock, 10000);
+
+  /* ---------- input ---------- */
+  function input(cmd){
+    resetIdle();
+    if (S.mode === 'saver' || S.mode === 'sleep') return wake();
+    if (S.mode === 'launch') { if (cmd === 'back' || cmd === 'home') closeLaunch(); return; }
+    if (S.mode === 'cc') {
+      if (cmd === 'up') { if (S.ccIdx > 0) { S.ccIdx--; tick(); renderCC(); } else bump(); }
+      else if (cmd === 'down') { if (S.ccIdx < ccItems.length-1) { S.ccIdx++; tick(); renderCC(); } else bump(); }
+      else if (cmd === 'ok') ccActivate();
+      else if (cmd === 'back' || cmd === 'cc' || cmd === 'home' || cmd === 'left') closeCC();
+      return;
+    }
+    if (S.mode === 'edit') {
+      if (['up','down','left','right'].includes(cmd)) editMove(cmd);
+      else if (cmd === 'ok' || cmd === 'back' || cmd === 'home') exitEdit();
+      return;
+    }
+    if (['up','down','left','right'].includes(cmd)) return move(cmd);
+    if (cmd === 'ok') return openApp();
+    if (cmd === 'cc') return openCC();
+    if (cmd === 'saver') return startSaver();
+    if (cmd === 'home') { if (S.zone === 'apps' && S.idx === 0) return bump(); S.zone = 'apps'; S.idx = 0; S.dockIdx = 0; tick(); return update(); }
+    if (cmd === 'back') {
+      if (S.zone === 'shelf') { S.zone = 'apps'; S.idx = S.dockIdx; tick(); return update(); }
+      if (S.idx >= 5) { S.idx = (S.idx-5)%5; S.dockIdx = S.idx; tick(); return update(); }
+      return bump();
+    }
+  }
+  // OK: a short press opens; holding it on an app enters reorder mode.
+  let pending = false, holdT = 0;
+  function okPress(){
+    resetIdle();
+    if (S.mode === 'saver' || S.mode === 'sleep') return wake();
+    if (S.mode === 'home' && S.zone === 'apps') {
+      pending = true; clearTimeout(holdT);
+      holdT = setTimeout(() => { if (pending) { pending = false; enterEdit(); } }, 550);
+    } else input('ok');
+  }
+  function okRelease(){ if (pending) { pending = false; clearTimeout(holdT); input('ok'); } }
+  function okCancel(){ pending = false; clearTimeout(holdT); }
+
+  const KEYMAP = {ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down', Escape:'back', Backspace:'back'};
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'Enter') { e.preventDefault(); if (!e.repeat) okPress(); return; }
+    if (KEYMAP[e.key]) { e.preventDefault(); input(KEYMAP[e.key]); return; }
+    const k = e.key.toLowerCase();
+    if (k === 'c') input('cc'); else if (k === 's') input('saver'); else if (k === 'h') input('home');
+    else if (S.mode === 'saver' || S.mode === 'sleep') wake();
+  });
+  document.addEventListener('keyup', e => { if (e.key === 'Enter') okRelease(); });
+  document.querySelectorAll('.remote [data-cmd]').forEach(b => b.addEventListener('click', () => input(b.dataset.cmd)));
+  const okBtn = $('okBtn');
+  okBtn.addEventListener('pointerdown', e => { e.preventDefault(); okPress(); });
+  okBtn.addEventListener('pointerup', okRelease);
+  okBtn.addEventListener('pointerleave', okCancel);
+  okBtn.addEventListener('pointercancel', okCancel);
+  okBtn.addEventListener('click', e => { if (e.detail === 0) input('ok'); });
+  frame.addEventListener('pointerdown', () => frame.focus({preventScroll:true}));
+  canvas.addEventListener('click', wake);
+  sleepEl.addEventListener('click', wake);
+  launch.addEventListener('click', () => { if (S.mode === 'launch') closeLaunch(); });
+
+  update(); resetIdle();
+})();
+</script>

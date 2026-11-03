@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 320x180 TV banner: a soft light bloom over ink, the same mood as the home backdrop -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path
+        android:fillColor="#07080B"
+        android:pathData="M0,0h320v180h-320z" />
+    <path
+        android:fillColor="#33F4F5F8"
+        android:pathData="M250,40m-90,0a90,90 0,1 1,180 0a90,90 0,1 1,-180 0" />
+    <path
+        android:fillColor="#66F4F5F8"
+        android:pathData="M250,40m-46,0a46,46 0,1 1,92 0a46,46 0,1 1,-92 0" />
+    <path
+        android:fillColor="#F4F5F8"
+        android:pathData="M48,62h14v42h26v14h-40z" />
+</vector>

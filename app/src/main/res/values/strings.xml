@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Lumen</string>
+    <string name="shelf_eyebrow">Top Shelf</string>
+    <string name="shelf_soon">Aquí aparecerá lo que esta app publique en su canal.</string>
+    <string name="shelf_welcome">Elige una app para empezar.</string>
+    <string name="shelf_continue">Continuar viendo</string>
+</resources>
