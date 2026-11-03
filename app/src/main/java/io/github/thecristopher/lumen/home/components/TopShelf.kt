@@ -6,6 +6,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,8 +16,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -23,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import io.github.thecristopher.lumen.R
 import io.github.thecristopher.lumen.apps.LaunchableApp
+import io.github.thecristopher.lumen.home.helpers.ManualScrollSpec
+import io.github.thecristopher.lumen.home.helpers.windowStart
 import io.github.thecristopher.lumen.shelf.ShelfItem
 import io.github.thecristopher.lumen.shelf.ShelfRow
 import io.github.thecristopher.lumen.ui.theme.LumenType
@@ -32,6 +43,9 @@ val ShelfHeight = 300.dp
 
 private val ShelfSide = 32.dp
 private val CardGap = 14.dp
+
+// A focused card grows 10%, about 11dp per side at 213dp wide.
+private val CardGrowRoom = 12.dp
 
 /**
  * The area above the dock. Shows what the focused dock app published (what you were watching, or its
@@ -46,7 +60,7 @@ fun TopShelf(app: LaunchableApp?, row: ShelfRow?, onOpen: (ShelfItem) -> Unit, m
         modifier
             .fillMaxWidth()
             .height(ShelfHeight)
-            .padding(bottom = 30.dp),
+            .padding(bottom = 6.dp),
         contentAlignment = Alignment.BottomStart,
     ) {
         AnimatedContent(
@@ -65,18 +79,29 @@ fun TopShelf(app: LaunchableApp?, row: ShelfRow?, onOpen: (ShelfItem) -> Unit, m
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ShelfCards(app: LaunchableApp, row: ShelfRow, onOpen: (ShelfItem) -> Unit) {
     val label = row.channelName ?: stringResource(R.string.shelf_continue)
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text("$label · ${app.label}", style = LumenType.ShelfLabel, modifier = Modifier.padding(horizontal = ShelfSide))
-        // Vertical padding leaves room for the focused card to grow without being clipped.
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = ShelfSide, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(CardGap),
-        ) {
-            items(row.items, key = { "${it.title}|${it.intentUri}" }) { item ->
-                ShelfCard(item, onClick = { onOpen(item) })
+        // The row is only as wide as the dock plus room for a focused card to grow, and it moves by
+        // whole cards, so no card ever shows cut at an edge.
+        val cards = rememberLazyListState()
+        var focusedCard by remember { mutableIntStateOf(0) }
+        LaunchedEffect(focusedCard) {
+            cards.animateScrollToItem(windowStart(cards.firstVisibleItemIndex, focusedCard))
+        }
+        CompositionLocalProvider(LocalBringIntoViewSpec provides ManualScrollSpec) {
+            LazyRow(
+                state = cards,
+                modifier = Modifier.padding(horizontal = ShelfSide - CardGrowRoom).fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = CardGrowRoom, vertical = CardGrowRoom),
+                horizontalArrangement = Arrangement.spacedBy(CardGap),
+            ) {
+                itemsIndexed(row.items, key = { _, it -> "${it.title}|${it.intentUri}" }) { index, item ->
+                    ShelfCard(item, onFocused = { focusedCard = index }, onClick = { onOpen(item) })
+                }
             }
         }
     }

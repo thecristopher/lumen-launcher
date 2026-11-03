@@ -1,6 +1,8 @@
 package io.github.thecristopher.lumen.home
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
@@ -11,12 +13,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -27,6 +30,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
@@ -45,7 +51,9 @@ import io.github.thecristopher.lumen.home.components.Backdrop
 import io.github.thecristopher.lumen.home.components.Clock
 import io.github.thecristopher.lumen.home.components.NeutralGlow
 import io.github.thecristopher.lumen.home.components.TopShelf
-import io.github.thecristopher.lumen.home.helpers.KeepInViewSpec
+import io.github.thecristopher.lumen.home.helpers.DOCK_ITEM
+import io.github.thecristopher.lumen.home.helpers.ManualScrollSpec
+import io.github.thecristopher.lumen.home.helpers.scrollAnchor
 import io.github.thecristopher.lumen.shelf.ShelfItem
 import io.github.thecristopher.lumen.shelf.ShelfRepository
 import io.github.thecristopher.lumen.shelf.ShelfRow
@@ -54,6 +62,10 @@ import io.github.thecristopher.lumen.ui.theme.LumenType
 private val SidePadding = 32.dp
 private val TileGap = 24.dp
 private val RowGap = 18.dp
+
+// Where a row lands once it scrolls up: just under the clock.
+private val RowTop = 64.dp
+private const val FADE_MS = 250
 
 /**
  * The home screen: backdrop, clock, Top Shelf, the dock, the apps you opened last and the grid of
@@ -102,29 +114,58 @@ fun HomeScreen(
         runCatching { firstTile.requestFocus() }
     }
 
+    var focusedItem by remember { mutableIntStateOf(DOCK_ITEM) }
+    val anchor = scrollAnchor(focusedItem)
+    val rowTopPx = with(LocalDensity.current) { RowTop.roundToPx() }
+    LaunchedEffect(anchor) {
+        listState.animateScrollToItem(anchor, if (anchor == 0) 0 else -rowTopPx)
+    }
+    val trackFocus = { index: Int -> Modifier.onFocusChanged { if (it.hasFocus) focusedItem = index } }
+
     // A launcher has nowhere to go back to.
     BackHandler {}
 
     Box(Modifier.fillMaxSize()) {
         Backdrop(glow = focused?.let { art[it.packageName]?.glow } ?: NeutralGlow)
-        CompositionLocalProvider(LocalBringIntoViewSpec provides KeepInViewSpec) {
+        // Focus never scrolls this list on its own; scrollAnchor decides where it goes.
+        CompositionLocalProvider(LocalBringIntoViewSpec provides ManualScrollSpec) {
             LazyColumn(
                 state = listState,
-                contentPadding = PaddingValues(bottom = 48.dp),
+                contentPadding = PaddingValues(bottom = 400.dp),
                 verticalArrangement = Arrangement.spacedBy(RowGap),
             ) {
-                item { TopShelf(shelfApp, shelves[shelfApp?.packageName], onOpen) }
-                item { TileRow(layout.dock, art, onFocused, onLaunch, firstTile) }
-                if (recentRow.isNotEmpty()) {
-                    item { RecentsRow(recentRow, art, onFocused, onLaunch) }
+                item {
+                    FadeAbove(0, anchor) { TopShelf(shelfApp, shelves[shelfApp?.packageName], onOpen, trackFocus(0)) }
                 }
-                items(layout.grid.chunked(DOCK_SIZE)) { row ->
-                    TileRow(row, art, onFocused, onLaunch)
+                item {
+                    FadeAbove(DOCK_ITEM, anchor) {
+                        TileRow(layout.dock, art, onFocused, onLaunch, firstTile, trackFocus(DOCK_ITEM))
+                    }
+                }
+                val gridStart = if (recentRow.isEmpty()) DOCK_ITEM + 1 else DOCK_ITEM + 2
+                if (recentRow.isNotEmpty()) {
+                    item {
+                        FadeAbove(DOCK_ITEM + 1, anchor) {
+                            RecentsRow(recentRow, art, onFocused, onLaunch, trackFocus(DOCK_ITEM + 1))
+                        }
+                    }
+                }
+                itemsIndexed(layout.grid.chunked(DOCK_SIZE)) { index, row ->
+                    FadeAbove(gridStart + index, anchor) {
+                        TileRow(row, art, onFocused, onLaunch, modifier = trackFocus(gridStart + index))
+                    }
                 }
             }
         }
         Clock(Modifier.align(Alignment.TopEnd).padding(top = 22.dp, end = SidePadding))
     }
+}
+
+/** Fades a row out once it sits above the anchored one, so nothing hangs cut under the clock. */
+@Composable
+private fun FadeAbove(index: Int, anchor: Int, content: @Composable () -> Unit) {
+    val alpha by animateFloatAsState(if (index < anchor) 0f else 1f, tween(FADE_MS), label = "fade")
+    Box(Modifier.graphicsLayer { this.alpha = alpha }) { content() }
 }
 
 @Composable
@@ -133,8 +174,9 @@ private fun RecentsRow(
     art: Map<String, AppArt>,
     onFocused: (LaunchableApp) -> Unit,
     onLaunch: (LaunchableApp) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
             stringResource(R.string.recents_title),
             style = LumenType.ShelfLabel,
@@ -155,9 +197,10 @@ private fun TileRow(
     onFocused: (LaunchableApp) -> Unit,
     onLaunch: (LaunchableApp) -> Unit,
     firstTile: FocusRequester? = null,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        Modifier.padding(horizontal = SidePadding),
+        modifier.padding(horizontal = SidePadding),
         horizontalArrangement = Arrangement.spacedBy(TileGap),
     ) {
         apps.forEachIndexed { index, app ->
